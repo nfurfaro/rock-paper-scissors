@@ -73,9 +73,8 @@ contract RockPaperScissors {
             contestants[Bob].hand = 0;
             if(gameStatus == 2) {
                 gameStatus = 0;
-                uint refund = ante;
-                contestants[Alice].winnings += refund;
-                contestants[Bob].winnings += refund;
+                contestants[Alice].winnings += ante;
+                contestants[Bob].winnings += ante;
                 LogWinnings("Alice's winnings:", contestants[Alice].winnings, "Bob's winnings:", contestants[Bob].winnings);
                 return true;
             } else {
