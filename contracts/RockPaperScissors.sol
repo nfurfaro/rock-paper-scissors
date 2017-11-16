@@ -2,13 +2,13 @@ pragma solidity ^0.4.6;
 
 
 contract RockPaperScissors {
+    bool public frozen;
     address public owner;
-    address public player;
     address public Alice;
     address public Bob;
     uint public ante;
     uint public playersReady;
-    uint public gameStatus;
+    // uint public gameStatus;
 
 
     struct PlayerData {
@@ -18,23 +18,18 @@ contract RockPaperScissors {
 
     mapping(address => PlayerData) contestants; 
     
-    event LogPlay(address player, uint deposit,  string codes, uint play);
-    event LogGameState(uint _playersReady, uint balance, string codes, uint _gameStatus);
-    event LogWinnings(string alices, uint amount1, string bobs, uint amount2);
+    event LogPlay(address player, uint deposit, uint play);
+    event LogGameOver(uint gameOutcome, uint AlicesWinnings, uint BobsWinnings);
     event LogWithdrawl(address withdrawer, uint amount);
+    event LogFreeze(bool isFrozen);
 
-    function RockPaperScissors()
+    function RockPaperScissors(address _Alice, address _Bob, uint _anteAmount)
         public
     {
         owner = msg.sender;
-        //remix
-        // Alice = 0x14723a09acff6d2a60dcdf7aa4aff308fddc160c;
-        // Bob = 0x4b0897b0513fdc7c541b6d9d7e929c4e5364d2db;
-        //testrpc
-        Alice = 0xa653157c9f2b34263f456953fd85de0211ce40e3;
-        Bob = 0xd996973097a0290ea7b025a5ad48863884c3bc30;
-        // ante = _anteAmount;
-        ante = 10;
+        ante = _anteAmount;
+        Alice = _Alice;
+        Bob = _Bob;
     }
 
     modifier isAliceOrBob() {
@@ -42,45 +37,50 @@ contract RockPaperScissors {
         _;
     }
 
-    modifier meetsRequirements() {
-        require(msg.value == ante);
-        require(contestants[msg.sender].hand == 0);
+    modifier freezeRay() {
+        require(!frozen);
         _;
     }
 
     function play(uint _hand)
-        isAliceOrBob
-        meetsRequirements 
+        freezeRay
+        isAliceOrBob 
         public 
         payable 
         returns (bool hasPlayed)
     {
+        require(msg.value == ante);
+        require(contestants[msg.sender].hand == 0);
         require(_hand != 0);
+        require(_hand < 4);
+        require(playersReady <= 1);
+        uint gameStatus;
+        uint stakes;
+        stakes += msg.value;
         if(playersReady == 0) {
             playersReady++;
             contestants[msg.sender].hand = _hand;
-            LogPlay(msg.sender, msg.value, "(1 = rock, 2 = paper, 3 = scissors)", _hand);
-            LogGameState(playersReady, this.balance, "(For Alice:  0 = undecided, 1 = Lose , 2 = draw, 3 = win)",  gameStatus);
+            LogPlay(msg.sender, msg.value, _hand);
             return true;
         } else if(playersReady == 1) {
             playersReady++;
             contestants[msg.sender].hand = _hand;
-            LogPlay(msg.sender, msg.value, "(1 = rock, 2 = paper, 3 = scissors)", _hand);
-            referee();
-            LogGameState(playersReady, this.balance, "(For Alice:  0 = undecided, 1 = Lose , 2 = draw, 3 = win)",  gameStatus);
+            LogPlay(msg.sender, msg.value, _hand);
+            gameStatus = referee();
+            require(gameStatus != 0);
             playersReady = 0;
             contestants[Alice].hand = 0;
             contestants[Bob].hand = 0;
             if(gameStatus == 2) {
+                contestants[Alice].winnings += stakes / 2;
+                contestants[Bob].winnings += stakes / 2;
+                LogGameOver(gameStatus, contestants[Alice].winnings, contestants[Bob].winnings);
                 gameStatus = 0;
-                contestants[Alice].winnings += ante;
-                contestants[Bob].winnings += ante;
-                LogWinnings("Alice's winnings:", contestants[Alice].winnings, "Bob's winnings:", contestants[Bob].winnings);
                 return true;
             } else {
+                contestants[msg.sender].winnings += stakes * 2;
+                LogGameOver(gameStatus, contestants[Alice].winnings, contestants[Bob].winnings);
                 gameStatus = 0;
-                contestants[msg.sender].winnings += ante * 2;
-                LogWinnings("Alice's winnings:", contestants[Alice].winnings, "Bob's winnings:", contestants[Bob].winnings);
                 return true;
             }
         }
@@ -88,40 +88,50 @@ contract RockPaperScissors {
     } 
     
     function withdraw()
-        isAliceOrBob
+        freezeRay
         public
         returns (bool success)
     {
         require(contestants[msg.sender].winnings != 0);
         uint amount = contestants[msg.sender].winnings;
-        LogWithdrawl(msg.sender, amount);
+        contestants[msg.sender].winnings = 0;
         msg.sender.transfer(amount);
+        LogWithdrawl(msg.sender, amount);
         return true;
     }
    
-    function referee() 
-        internal 
+   // For Alice:  0 = undecided, 1 = Lose , 2 = draw, 3 = win
+   // 1 = rock, 2 = paper, 3 = scissors
+    function referee()
+        public
+        constant
+        returns (uint returnValue) 
     {
         require(playersReady == 2);
         uint A = contestants[Alice].hand;
         uint B = contestants[Bob].hand;
         if(A == 1) {
-            if(B == 1) gameStatus = 2;
-            if(B == 2) gameStatus = 1;
-            if(B == 3) gameStatus = 3;
+            if(B == 1) return 2;
+            if(B == 2) return 1;
+            if(B == 3) return 3;
         } else if(A == 2) {
-            if(B == 2) gameStatus = 2;
-            if(B == 3) gameStatus = 1;
-            if(B == 1) gameStatus = 3;
+            if(B == 2) return 2;
+            if(B == 3) return 1;
+            if(B == 1) return 3;
         } else if(A == 3) {
-            if(B == 3) gameStatus = 2;
-            if(B == 1) gameStatus = 1;
-            if(B == 2) gameStatus = 3;
+            if(B == 3) return 2;
+            if(B == 1) return 1;
+            if(B == 2) return 3;
+        } else {
+            return 0;
         }
     }
 
-    function getLogs() public {
-        LogGameState(playersReady, this.balance, "(For Alice:  0 = undecided, 1 = Lose , 2 = draw, 3 = win)",  gameStatus);
-        LogWinnings("Alice's winnings:", contestants[Alice].winnings, "Bob's winnings:", contestants[Bob].winnings);
+    function freezerSwitch(bool _freeze)
+        returns (bool success) {
+            require(msg.sender == owner);
+            frozen = _freeze;
+            LogFreeze(frozen);
+            return true;
     }
 }
