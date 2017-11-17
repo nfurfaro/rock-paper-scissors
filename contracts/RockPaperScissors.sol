@@ -1,32 +1,27 @@
 pragma solidity ^0.4.6;
 
+import "./Freezable.sol";
 
-contract RockPaperScissors {
-    bool public frozen;
-    address public owner;
+contract RockPaperScissors is Freezable {
     address public Alice;
     address public Bob;
     uint public ante;
     uint public playersReady;
-    // uint public gameStatus;
-
 
     struct PlayerData {
         uint winnings;
-        uint hand;
+        uint8 hand;
     }
 
     mapping(address => PlayerData) contestants; 
     
-    event LogPlay(address player, uint deposit, uint play);
-    event LogGameOver(uint gameOutcome, uint AlicesWinnings, uint BobsWinnings);
+    event LogPlay(address player, uint deposit, uint8 play);
     event LogWithdrawl(address withdrawer, uint amount);
-    event LogFreeze(bool isFrozen);
+    event LogOutcome(uint8 outcome);
 
     function RockPaperScissors(address _Alice, address _Bob, uint _anteAmount)
         public
     {
-        owner = msg.sender;
         ante = _anteAmount;
         Alice = _Alice;
         Bob = _Bob;
@@ -37,12 +32,7 @@ contract RockPaperScissors {
         _;
     }
 
-    modifier freezeRay() {
-        require(!frozen);
-        _;
-    }
-
-    function play(uint _hand)
+    function play(uint8 _hand)
         freezeRay
         isAliceOrBob 
         public 
@@ -54,7 +44,7 @@ contract RockPaperScissors {
         require(_hand != 0);
         require(_hand < 4);
         require(playersReady <= 1);
-        uint gameStatus;
+        uint8 gameStatus;
         uint stakes;
         stakes += msg.value;
         if(playersReady == 0) {
@@ -67,6 +57,7 @@ contract RockPaperScissors {
             contestants[msg.sender].hand = _hand;
             LogPlay(msg.sender, msg.value, _hand);
             gameStatus = referee();
+            LogOutcome(gameStatus);
             require(gameStatus != 0);
             playersReady = 0;
             contestants[Alice].hand = 0;
@@ -74,12 +65,10 @@ contract RockPaperScissors {
             if(gameStatus == 2) {
                 contestants[Alice].winnings += stakes / 2;
                 contestants[Bob].winnings += stakes / 2;
-                LogGameOver(gameStatus, contestants[Alice].winnings, contestants[Bob].winnings);
                 gameStatus = 0;
                 return true;
             } else {
                 contestants[msg.sender].winnings += stakes * 2;
-                LogGameOver(gameStatus, contestants[Alice].winnings, contestants[Bob].winnings);
                 gameStatus = 0;
                 return true;
             }
@@ -105,11 +94,11 @@ contract RockPaperScissors {
     function referee()
         public
         constant
-        returns (uint returnValue) 
+        returns (uint8 returnValue) 
     {
         require(playersReady == 2);
-        uint A = contestants[Alice].hand;
-        uint B = contestants[Bob].hand;
+        uint8 A = contestants[Alice].hand;
+        uint8 B = contestants[Bob].hand;
         if(A == 1) {
             if(B == 1) return 2;
             if(B == 2) return 1;
@@ -125,13 +114,5 @@ contract RockPaperScissors {
         } else {
             return 0;
         }
-    }
-
-    function freezerSwitch(bool _freeze)
-        returns (bool success) {
-            require(msg.sender == owner);
-            frozen = _freeze;
-            LogFreeze(frozen);
-            return true;
     }
 }

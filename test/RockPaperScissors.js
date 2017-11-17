@@ -25,14 +25,12 @@ contract('RockPaperScissors', accounts => {
         })
     });
 
-    it("should decide the match fairly", () => {
-        return instance.play(1, {from: Alice, value: 8000000000000000}).then(() => {
-            return instance.play(3, {from: Bob, value: 8000000000000000})
-        }).then((txObj) => {
-            assert.equal(txObj.logs[1].args.gameOutcome.toString(10), "3", "referee() is not being fair");
-            assert.equal(txObj.logs[1].args.AlicesWinnings.toString(10), "0", "error with contract accounting");
-            assert.equal(txObj.logs[1].args.BobsWinnings.toString(10), "16000000000000000", "error with contract accounting");
-        })    
+    it("should let owner freeze all key functions", () => {
+        return instance.freeze(true, {from: owner}).then(() => {
+            return instance.frozen()
+        }).then(_frozen => {
+            assert.equal(_frozen.toString(10), "true", "the freezeRay is not working!")
+        })
     })
 
     it("should allow a player to withdraw their winnings", () => {
@@ -68,11 +66,59 @@ contract('RockPaperScissors', accounts => {
         })
 
     })
+// ===========================================================   
+// referee() tests:
+    it("should decide the match fairly", () => {
+        return instance.play(1, {from: Alice, value: 8000000000000000}).then(() => {
+            return instance.play(1, {from: Bob, value: 8000000000000000})
+        }).then((txObj) => {
+            console.log(txObj.logs);
+            assert.equal(txObj.logs[1].args.outcome.toString(10), "2", "referee() is not being fair");
+        })    
+    })
+
+    it("should decide the match fairly", () => {
+        return instance.play(2, {from: Alice, value: 8000000000000000}).then(() => {
+            return instance.play(2, {from: Bob, value: 8000000000000000})
+        }).then((txObj) => {
+            console.log(txObj.logs);
+            assert.equal(txObj.logs[1].args.outcome.toString(10), "2", "referee() is not being fair");
+        })    
+    })
+
+    it("should decide the match fairly", () => {
+        return instance.play(3, {from: Alice, value: 8000000000000000}).then(() => {
+            return instance.play(3, {from: Bob, value: 8000000000000000})
+        }).then((txObj) => {
+            console.log(txObj.logs);
+            assert.equal(txObj.logs[1].args.outcome.toString(10), "2", "referee() is not being fair");
+        })    
+    }) 
+   
+    it("should decide the match fairly", () => {
+        return instance.play(1, {from: Alice, value: 8000000000000000}).then(() => {
+            return instance.play(2, {from: Bob, value: 8000000000000000})
+        }).then((txObj) => {
+            console.log(txObj.logs);
+            assert.equal(txObj.logs[1].args.outcome.toString(10), "1", "referee() is not being fair");
+        })    
+    })
+
+    it("should decide the match fairly", () => {
+        return instance.play(1, {from: Alice, value: 8000000000000000}).then(() => {
+            return instance.play(3, {from: Bob, value: 8000000000000000})
+        }).then((txObj) => {
+            console.log(txObj.logs);
+            assert.equal(txObj.logs[1].args.outcome.toString(10), "3", "referee() is not being fair");
+        })    
+    })
+
+    it("should decide the match fairly", () => {
+        return instance.play(2, {from: Alice, value: 8000000000000000}).then(() => {
+            return instance.play(3, {from: Bob, value: 8000000000000000})
+        }).then((txObj) => {
+            console.log(txObj.logs);
+            assert.equal(txObj.logs[1].args.outcome.toString(10), "1", "referee() is not being fair");
+        })    
+    })
 })
-
-
-
-
-// web3.eth.getTransactionReceipt(transactionHash, function(err, transaction) {
-//     console.info(transaction);    
-//   })
