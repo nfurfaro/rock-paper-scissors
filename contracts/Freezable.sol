@@ -16,8 +16,9 @@ contract Freezable is Owned {
     function freeze(bool _freeze)
         onlyOwner
         returns (bool success) {
+            require(_freeze != frozen);
             frozen = _freeze;
-            LogFreeze(msg.sender, frozen);
+            LogFreeze(msg.sender, _freeze);
             return true;
     }
 }

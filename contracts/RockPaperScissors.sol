@@ -6,7 +6,7 @@ contract RockPaperScissors is Freezable {
     address public Alice;
     address public Bob;
     uint public ante;
-    uint public playersReady;
+    uint8 public playersReady;
 
     struct PlayerData {
         uint winnings;
@@ -56,7 +56,8 @@ contract RockPaperScissors is Freezable {
             playersReady++;
             contestants[msg.sender].hand = _hand;
             LogPlay(msg.sender, msg.value, _hand);
-            gameStatus = referee();
+            //require(playersReady == 2);
+            gameStatus = referee(contestants[Alice].hand, contestants[Bob].hand);
             LogOutcome(gameStatus);
             require(gameStatus != 0);
             playersReady = 0;
@@ -91,14 +92,37 @@ contract RockPaperScissors is Freezable {
    
    // For Alice:  0 = undecided, 1 = Lose , 2 = draw, 3 = win
    // 1 = rock, 2 = paper, 3 = scissors
-    function referee()
+    // function referee()
+    //     public
+    //     constant
+    //     returns (uint8 returnValue) 
+    // {
+    //     require(playersReady == 2);
+    //     uint8 A = contestants[Alice].hand;
+    //     uint8 B = contestants[Bob].hand;
+    //     if(A == 1) {
+    //         if(B == 1) return 2;
+    //         if(B == 2) return 1;
+    //         if(B == 3) return 3;
+    //     } else if(A == 2) {
+    //         if(B == 2) return 2;
+    //         if(B == 3) return 1;
+    //         if(B == 1) return 3;
+    //     } else if(A == 3) {
+    //         if(B == 3) return 2;
+    //         if(B == 1) return 1;
+    //         if(B == 2) return 3;
+    //     } else {
+    //         return 0;
+    //     }
+    // }
+
+    function referee(uint8 A, uint8 B)
         public
-        constant
+        pure
         returns (uint8 returnValue) 
     {
-        require(playersReady == 2);
-        uint8 A = contestants[Alice].hand;
-        uint8 B = contestants[Bob].hand;
+        
         if(A == 1) {
             if(B == 1) return 2;
             if(B == 2) return 1;
@@ -116,3 +140,4 @@ contract RockPaperScissors is Freezable {
         }
     }
 }
+ 
