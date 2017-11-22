@@ -87,13 +87,12 @@ contract RockPaperScissors is Freezable {
         if(keccak256(_nakedHand) == contestants[msg.sender].hashedHand) {
             contestants[msg.sender].revealedHand = _nakedHand;
             validHandsRevealed++;
-            // switch to if, don't want it to throw if this is first player to reveal!
-            require(validHandsRevealed == 2);
-            gameController();
             logRevealedHand(msg.sender, _nakedHand);
-            return true;
-        } else 
-            if(msg.sender == Alice) {
+            if(validHandsRevealed == 2) {
+                gameController();
+                return true;
+            } else return true;  
+        } else if(msg.sender == Alice) {
                 gameStatus = 1;
                 return false;
             } else if(msg.sender == Bob) {
@@ -117,17 +116,20 @@ contract RockPaperScissors is Freezable {
             contestants[Alice].hashedHand = bytes32(0);
             contestants[Bob].hashedHand = bytes32(0);
             if(gameStatus == 1) {
-                contestants[Bob].winnings += stakes * 2;
+                contestants[Bob].winnings += stakes;
                 gameStatus = 0;
+                stakes = 0;
                 return true;
             } else if(gameStatus == 2) {
                 contestants[Alice].winnings += stakes / 2;
                 contestants[Bob].winnings += stakes / 2;
                 gameStatus = 0;
+                stakes = 0;
                 return true;
             } else if(gameStatus == 3) {
-                contestants[Alice].winnings += stakes * 2;
+                contestants[Alice].winnings += stakes;
                 gameStatus = 0;
+                stakes = 0;
                 return true;    
             } else return false;
         }
