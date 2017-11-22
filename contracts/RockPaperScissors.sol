@@ -6,21 +6,23 @@ contract RockPaperScissors is Freezable {
     address public Alice;
     address public Bob;
     uint public ante;
-    uint8 public playsSubmitted;
+    uint8 public hashedHandsPlayed;
     uint8 public validHandsRevealed;
-    bool public safeToRevealHands;
+    uint8 gameStatus;
+    uint stakes;
+
 
     struct PlayerData {
         uint winnings;
         uint8 revealedHand;
-        bytes32 hashedHand;    
+        bytes32 hashedHand;   
     }
 
 
     mapping(address => PlayerData) public contestants; 
     
-    event LogPlay(uint8 _playsSubmitted, address player, uint deposit, bytes32 _hashedHand, bool _safeToRevealHands);
-    event logReveal(address player, uint8 revealedHand);
+    event LogPlay(uint8 _hashedHandsPlayed, address player, uint deposit, bytes32 _hashedHand);
+    event logRevealedHand(address player, uint8 revealedHand);
     event LogOutcome(uint8 outcome);
     event LogWithdrawl(address withdrawer, uint amount);
 
@@ -38,76 +40,99 @@ contract RockPaperScissors is Freezable {
         _;
     }
 
+    function handHasher(uint8 _hand)
+        public
+        pure
+        returns(bytes32 hashedHand)
+    {    
+        require(_hand != 0);
+        require(_hand < 4);
+        return keccak256(_hand);
+    }
+
+    // input value is output from handHasher(), sent from the client.
     function playSecretHand(bytes32 _hashedHand)
         freezeRay
         isAliceOrBob 
         public 
         payable 
         returns (bool hasPlayed)
-    {   
+    {
         require(msg.value == ante);
-        require(contestants[msg.sender].hashedHand == keccak256([0]));
-        require(_hashedHand != 0);
-        require(_hashedHand < 4);
-        require(playsSubmitted <= 1);
-        uint8 gameStatus;
-        uint stakes;
+        require(contestants[msg.sender].hashedHand == bytes32(0));
+        require(hashedHandsPlayed <= 1);
         stakes += msg.value;
-        if(playsSubmitted == 0) {
-            playsSubmitted++;
+        if(hashedHandsPlayed == 0) {
+            hashedHandsPlayed++;
             contestants[msg.sender].hashedHand = _hashedHand;
-            LogPlay(playsSubmitted, msg.sender, msg.value, _hashedHand, safeToRevealHands);
+            LogPlay(hashedHandsPlayed, msg.sender, msg.value, _hashedHand);
             return true;
-        } else if(playsSubmitted == 1) {
+        } else if(hashedHandsPlayed == 1) {
             contestants[msg.sender].hashedHand = _hashedHand;
-            playsSubmitted++;
-            safeToRevealHands = true;
-            LogPlay(playsSubmitted, msg.sender, msg.value, _hashedHand, safeToRevealHands);
-            // require(validateRevealedHand());
+            hashedHandsPlayed++;
+            // client can listen for `hashedHandsPlayed == 2` before enabling proveHand() step.
+            LogPlay(hashedHandsPlayed, msg.sender, msg.value, _hashedHand);
+            return true;
+            } else return false;
+    }
+
+    function proveHand(uint8 _nakedHand)
+        public
+        freezeRay
+        isAliceOrBob
+        returns (bool validHand)
+    {
+        require(hashedHandsPlayed == 2);
+        require(contestants[msg.sender].revealedHand == 0);
+        if(keccak256(_nakedHand) == contestants[msg.sender].hashedHand) {
+            contestants[msg.sender].revealedHand = _nakedHand;
+            validHandsRevealed++;
+            // switch to if, don't want it to throw if this is first player to reveal!
             require(validHandsRevealed == 2);
+            gameController();
+            logRevealedHand(msg.sender, _nakedHand);
+            return true;
+        } else 
+            if(msg.sender == Alice) {
+                gameStatus = 1;
+                return false;
+            } else if(msg.sender == Bob) {
+                gameStatus = 3;
+                return false;
+            } else return false;
+    }
+
+    function gameController()
+        freezeRay
+        internal
+        returns (bool success)
+    {
+        if(validHandsRevealed != 2) {
+            return false;
+        } else {
             gameStatus = referee(contestants[Alice].revealedHand, contestants[Bob].revealedHand);
-            safeToRevealHands = false;
+            validHandsRevealed = 0;
             LogOutcome(gameStatus);
-            require(gameStatus != 0);
-            playsSubmitted = 0;
-            contestants[Alice].hashedHand = keccak256([0]);
-            contestants[Bob].hashedHand = keccak256([0]);
-            if(gameStatus == 2) {
+            hashedHandsPlayed = 0;
+            contestants[Alice].hashedHand = bytes32(0);
+            contestants[Bob].hashedHand = bytes32(0);
+            if(gameStatus == 1) {
+                contestants[Bob].winnings += stakes * 2;
+                gameStatus = 0;
+                return true;
+            } else if(gameStatus == 2) {
                 contestants[Alice].winnings += stakes / 2;
                 contestants[Bob].winnings += stakes / 2;
                 gameStatus = 0;
                 return true;
-            } else {
-                contestants[msg.sender].winnings += stakes * 2;
+            } else if(gameStatus == 3) {
+                contestants[Alice].winnings += stakes * 2;
                 gameStatus = 0;
-                return true;
-            }
+                return true;    
+            } else return false;
         }
+    }
 
-    } 
-    
-    function revealHand(uint8 _hand, string _secret)
-        public
-        freezeRay
-        isAliceOrBob
-        returns (bool validHand) 
-    {
-        require(safeToRevealHands == true);
-        bytes32 newHash = keccak256(_hand, _secret);
-        require(newHash == contestants[msg.sender].hashedHand); 
-            if(validHandsRevealed == 0) {
-                contestants[msg.sender].revealedHand = _hand;
-                validHandsRevealed++;
-                logReveal(msg.sender, _hand);
-                return true;
-            } else if (validHandsRevealed == 1) {
-                contestants[msg.sender].revealedHand = _hand;
-                validHandsRevealed++;
-                logReveal(msg.sender, _hand);
-                return true;
-            } else return false;  
-    }     
-   
    // For Alice:  0 = undecided, 1 = Lose , 2 = draw, 3 = win
    // 1 = rock, 2 = paper, 3 = scissors
     function referee(uint8 A, uint8 B)
